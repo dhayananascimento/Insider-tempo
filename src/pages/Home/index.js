@@ -1,105 +1,80 @@
-import React from "react";
-import { SafeAreaView, View, Text, StyleSheet, FlatList } from "react-native";
+import React, { useEffect, useState } from "react";
+import { SafeAreaView, StyleSheet, FlatList, View, Text } from "react-native";
+import * as Location from "expo-location";
+
+import api, { key } from "../../services/api";
 
 import Menu from "../../components/Menu";
 import Header from "../../components/Header";
 import Conditions from "../../components/Conditions";
 import Forecast from "../../components/Forecast";
 
-const myList = [
-  {
-    date: "10/04",
-    weekday: "Sáb",
-    max: 26,
-    min: 15,
-    description: "Ensolarado",
-    condition: "clear_day",
-  },
-  {
-    date: "11/04",
-    weekday: "Dom",
-    max: 27,
-    min: 14,
-    description: "Ensolarado",
-    condition: "clear_day",
-  },
-  {
-    date: "12/04",
-    weekday: "Seg",
-    max: 28,
-    min: 16,
-    description: "Parcialmente nublado",
-    condition: "cloudly_day",
-  },
-  {
-    date: "13/04",
-    weekday: "Ter",
-    max: 19,
-    min: 16,
-    description: "Trovoadas dispersas",
-    condition: "storm",
-  },
-  {
-    date: "14/04",
-    weekday: "Qua",
-    max: 20,
-    min: 15,
-    description: "Tempo nublado",
-    condition: "cloud",
-  },
-  {
-    date: "15/04",
-    weekday: "Qui",
-    max: 23,
-    min: 15,
-    description: "Tempo nublado",
-    condition: "cloud",
-  },
-  {
-    date: "16/04",
-    weekday: "Sex",
-    max: 23,
-    min: 15,
-    description: "Tempo nublado",
-    condition: "cloud",
-  },
-  {
-    date: "17/04",
-    weekday: "Sáb",
-    max: 21,
-    min: 16,
-    description: "Tempestades isoladas",
-    condition: "storm",
-  },
-  {
-    date: "18/04",
-    weekday: "Dom",
-    max: 21,
-    min: 16,
-    description: "Tempestades isoladas",
-    condition: "storm",
-  },
-  {
-    date: "19/04",
-    weekday: "Seg",
-    max: 20,
-    min: 16,
-    description: "Tempestades isoladas",
-    condition: "storm",
-  },
-];
-
 export default function Home() {
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState([]);
+  const [icon, setIcon] = useState({ name: "cloud", color: "#fff" });
+  const [background, setBackground] = useState(["#1ed6ff", "#97c1ff"]);
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestPermissionsAsync();
+
+      if (status !== "granted") {
+        setErrorMessage("Permissão negada para acessar localização.");
+        setLoading(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const response = await api.get(
+        `/weather?key=${key}&lat=${latitude}&lon=${longitude}`
+      );
+
+      setWeather(response.data);
+
+      if (response.data.results.currently === "noite") {
+        setBackground(["#0c3741", "#0f2f61"]);
+      }
+
+      switch (response.data.results.condition_slug) {
+        case "clear_day":
+          setIcon({ name: "partly-sunny", color: "#ffb300" });
+          break;
+        case ("rain", "storm"):
+          setIcon({ name: "rainy", color: "#fff" });
+          break;
+      }
+
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text styled={{ fontSize: 17, fontStyle: "italic" }}>
+          Carregando...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <Menu />
-      <Header />
-      <Conditions />
+
+      <Header background={background} weather={weather} icon={icon} />
+
+      <Conditions weather={weather} />
 
       <FlatList
+        showsHorizontalScrollIndicator={false}
         horizontal
         style={styles.list}
-        data={myList}
+        data={weather.results.forecast}
         keyExtractor={(item) => item.date}
         renderItem={({ item }) => <Forecast data={item} />}
         contentContainerStyle={{ paddingBottom: "5%" }}
@@ -111,7 +86,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: "5%",
+    paddingTop: "10%",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#e8f0ff",
